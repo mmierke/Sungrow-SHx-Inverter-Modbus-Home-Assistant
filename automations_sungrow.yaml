@@ -1,0 +1,963 @@
+# Home Assistant Sungrow inverter integration
+# https://github.com/mkaiser/Sungrow-SHx-Inverter-Modbus-Home-Assistant
+# by Martin Kaiser
+#
+# last update: 2025-02-15
+#
+# Note: This YAML file will only work with Home Assistant >= 2024.10
+
+# Automations: Write modbus registers on input changes via GUI
+# note: If you change a value by the sliders, it will take up to 60 seconds until the state variables are updated
+# Unfortunately, I could not find a way to "force update" modbus registers, yet...
+automation:
+  - alias: sungrow update inverter state
+    description: Enables / stops the inverter
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_select.set_sg_inverter_run_mode
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 12999
+                  value: >
+                    {% if is_state('input_select.set_sg_inverter_run_mode',
+                    "Enabled") %}
+                      {{sg_start}}
+                    {% else %}
+                      {{sg_stop}}
+                    {% endif %}
+          - conditions: []
+            sequence:
+              - action: input_select.select_option
+                target:
+                  entity_id: input_select.set_sg_inverter_run_mode
+                data:
+                  option: |
+                    {% if is_state('sensor.sungrow_inverter_state', "Shutdown") %}
+                      Shutdown
+                    {% else %}
+                      Enabled
+                    {% endif %}
+    mode: single
+
+
+  - alias: sungrow inverter state input selector update
+    description: >-
+      Updates inverter state input selector whenever changed value is returned by
+      modbus
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.sungrow_inverter_state
+    conditions:
+      - condition: template
+        value_template: "{{ not is_state('sensor.sungrow_inverter_state', 'unavailable') }}"
+    actions:
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.set_sg_inverter_run_mode
+        data:
+          option: |
+            {% if is_state('sensor.sungrow_inverter_state', "Shutdown") %}
+              Shutdown
+            {% else %}
+              Enabled
+            {% endif %}
+    mode: single
+
+  - alias: sungrow inverter update max SoC
+    description: Updates Sungrow max Soc holding register
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_number.set_sg_max_soc
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 13057
+                  value: "{{ states('input_number.set_sg_max_soc') | int *10}}"
+          - conditions: []
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.set_sg_max_soc
+                data:
+                  value: "{{ states('sensor.max_soc') }}"
+    mode: single
+
+
+  - alias: sungrow inverter max SoC input slider update
+    description: Updates Sungrow max Soc input slider
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.max_soc
+    conditions:
+      - condition: template
+        value_template: "{{ not is_state('sensor.max_soc', 'unavailable') }}"
+    actions:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.set_sg_max_soc
+        data:
+          value: "{{ states('sensor.max_soc') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update min SoC
+    description: Updates Sungrow min Soc holding register
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_number.set_sg_min_soc
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 13058
+                  value: "{{ states('input_number.set_sg_min_soc') | int *10}}"
+          - conditions: []
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.set_sg_min_soc
+                data:
+                  value: "{{ states('sensor.min_soc') }}"
+    mode: single
+
+
+  - alias: sungrow inverter min SoC input slider update
+    description: Updates Sungrow min Soc input slider
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.min_soc
+    conditions:
+      - condition: template
+        value_template: "{{ not is_state('sensor.min_soc', 'unavailable') }}"
+    actions:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.set_sg_min_soc
+        data:
+          value: "{{ states('sensor.min_soc') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update reserved soc for backup
+    description: Updates reserved SoC for backup register
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_number.set_sg_reserved_soc_for_backup
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 13058
+                  value: "{{ states('input_number.set_sg_min_soc') | int *10}}"
+          - conditions: []
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.set_sg_reserved_soc_for_backup
+                data:
+                  value: "{{ states('sensor.reserved_soc_for_backup') }}"
+    mode: single
+
+
+  - alias: sungrow inverter reserved backup SoC input slider update
+    description: Updates Sungrow reserved backup Soc input slider
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.reserved_soc_for_backup
+    conditions:
+      - condition: template
+        value_template: "{{ not is_state('sensor.reserved_soc_for_backup', 'unavailable') }}"
+    actions:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.set_sg_reserved_soc_for_backup
+        data:
+          value: "{{ states('sensor.reserved_soc_for_backup') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update battery forced charge discharge cmd
+    description: Updates Sungrow holding register for battery forced charge discharge command
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_select.set_sg_battery_forced_charge_discharge_cmd
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 13050
+                  value: >
+                    {% if
+                    is_state('input_select.set_sg_battery_forced_charge_discharge_cmd',
+                    "Stop (default)") %}
+                      {{ems_stop_default}}
+                    {% elif
+                    is_state('input_select.set_sg_battery_forced_charge_discharge_cmd',
+                    "Forced charge") %}
+                      {{ems_forced_charge}}
+                    {% elif
+                    is_state('input_select.set_sg_battery_forced_charge_discharge_cmd',
+                    "Forced discharge") %}
+                      {{ems_forced_discharge}}
+                    {% else %}
+                      {{ems_stop_default}}
+                    {% endif %}
+          - conditions: []
+            sequence:
+              - action: input_select.select_option
+                target:
+                  entity_id: input_select.set_sg_battery_forced_charge_discharge_cmd
+                data:
+                  option: "{{ states('sensor.battery_forced_charge_discharge_cmd') }}"
+    mode: single
+    variables:
+      ems_forced_charge: 170
+      ems_forced_discharge: 187
+      ems_stop_default: 204
+
+
+  - alias: >-
+      sungrow inverter update battery forced charge discharge cmd input select
+      update
+    description: Updates Sungrow battery forced charge discharge cmd input select
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.battery_forced_charge_discharge_cmd
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ not is_state('sensor.battery_forced_charge_discharge_cmd',
+          'unavailable') }}
+    actions:
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.set_sg_battery_forced_charge_discharge_cmd
+        data:
+          option: "{{ states('sensor.battery_forced_charge_discharge_cmd') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update EMS mode
+    description: Updates EMS mode
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_select.set_sg_ems_mode
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 13049
+                  value: >
+                    {% if is_state('input_select.set_sg_ems_mode', "Self-consumption
+                    mode (default)") %}
+                      {{ems_mode_self_consume}}
+                    {% elif is_state('input_select.set_sg_ems_mode', "Forced mode")
+                    %}
+                      {{ems_mode_forced}}
+                    {% elif is_state('input_select.set_sg_ems_mode', "External EMS")
+                    %}
+                      {{ems_mode_external}}
+                    {% elif is_state('input_select.set_sg_ems_mode', "VPP") %}
+                      {{ems_mode_vpp}}
+                    {% elif is_state('input_select.set_sg_ems_mode', "MicroGrid")
+                    %}
+                      {{ems_mode_microgrid}}
+                    {% else %}
+                      {{ems_mode_self_consume}}
+                    {% endif %}
+          - conditions: []
+            sequence:
+              - action: input_select.select_option
+                target:
+                  entity_id: input_select.set_sg_export_power_limit_mode
+                data:
+                  option: >
+                    {% if ((states('sensor.export_power_limit_mode_raw') |int) ==
+                    0x00AA) %}
+                      Enabled
+                    {% elif ((states('sensor.export_power_limit_mode_raw') |int) ==
+                    0x0055) %}
+                      Disabled
+                    {% endif %}
+    mode: single
+    variables:
+      ems_mode_self_consume: 0
+      ems_mode_forced: 2
+      ems_mode_external: 3
+      ems_mode_vpp: 4
+      ems_mode_microgrid: 8
+
+  - alias: sungrow inverter update EMS mode input select update
+    description: Updates EMS mode input select
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.ems_mode_selection
+    conditions:
+      - condition: template
+        value_template: "{{ not is_state('sensor.ems_mode_selection', 'unavailable') }}"
+    actions:
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.set_sg_ems_mode
+        data:
+          option: "{{ states('sensor.ems_mode_selection') }}"
+    mode: single
+
+  - alias: sungrow inverter export power limit mode
+    description: Set export power limit mode
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_select.set_sg_export_power_limit_mode
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 13086
+                  value: >
+                    {% if is_state('input_select.set_sg_export_power_limit_mode',
+                    "Enabled") %}
+                      {{export_limit_enable}}
+                    {% elif is_state('input_select.set_sg_export_power_limit_mode',
+                    "Disabled") %}
+                      {{export_limit_disable}}
+                    {% else %}
+                      {{export_limit_disable}}
+                    {% endif %}
+          - conditions: []
+            sequence:
+              - action: input_select.select_option
+                target:
+                  entity_id: input_select.set_sg_export_power_limit_mode
+                data:
+                  option: >
+                    {% if ((states('sensor.export_power_limit_mode_raw') |int) ==
+                    0x00AA) %}
+                      Enabled
+                    {% elif ((states('sensor.export_power_limit_mode_raw') |int) ==
+                    0x0055) %}
+                      Disabled
+                    {% endif %}
+    mode: single
+    variables:
+      export_limit_enable: 170
+      export_limit_disable: 85
+
+
+  - alias: sungrow inverter export power limit mode input select update
+    description: Updates input select for export power limit mode
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.export_power_limit_mode_raw
+    conditions:
+      - condition: template
+        value_template: "{{ not is_state('sensor.export_power_limit_mode_raw', 'unavailable') }}"
+    actions:
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.set_sg_export_power_limit_mode
+        data:
+          option: >
+            {% if ((states('sensor.export_power_limit_mode_raw') |int) == 0x00AA)
+            %}
+              Enabled
+            {% elif ((states('sensor.export_power_limit_mode_raw') |int) == 0x0055)
+            %}
+              Disabled
+            {% endif %}
+    mode: single
+
+
+  - alias: sungrow inverter backup mode
+    description: Set backup mode
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_select.set_sg_backup_mode
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 13074
+                  value: >
+                    {% if is_state('input_select.set_sg_backup_mode', "Enabled") %}
+                      {{enable}}
+                    {% elif is_state('input_select.set_sg_backup_mode', "Disabled")
+                    %}
+                      {{disable}}
+                    {% else %}
+                      {{disable}}
+                    {% endif %}
+          - conditions: []
+            sequence:
+              - action: input_select.select_option
+                target:
+                  entity_id: input_select.set_sg_backup_mode
+                data:
+                  option: |
+                    {% if ((states('sensor.backup_mode_raw') |int) == 0xAA) %}
+                      Enabled
+                    {% elif ((states('sensor.backup_mode_raw') |int) == 0x55) %}
+                      Disabled
+                    {% endif %}
+    mode: single
+    variables:
+      enable: 170
+      disable: 85
+
+
+  - alias: sungrow inverter backup mode input select update
+    description: Updates input select for backup mode
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.backup_mode_raw
+    conditions:
+      - condition: template
+        value_template: "{{ not is_state('sensor.backup_mode_raw', 'unavailable') }}"
+    actions:
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.set_sg_backup_mode
+        data:
+          option: |
+            {% if ((states('sensor.backup_mode_raw') |int) == 0xAA) %}
+              Enabled
+            {% elif ((states('sensor.backup_mode_raw') |int) == 0x55) %}
+              Disabled
+            {% endif %}
+    mode: single
+
+  - alias: sungrow inverter export power limit
+    description: Sets export power limit
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_number.set_sg_export_power_limit
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 13073
+                  value: "{{ states('input_number.set_sg_export_power_limit') }}"
+          - conditions: []
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.set_sg_export_power_limit
+                data:
+                  value: "{{ states('sensor.export_power_limit') }}"
+    mode: single
+
+
+  - alias: sungrow inverter export power limit input select update
+    description: Updates export power limit slider
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.export_power_limit
+    conditions: []
+    actions:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.set_sg_export_power_limit
+        data:
+          value: "{{ states('sensor.export_power_limit') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update battery forced charge discharge power
+    description: Sets battery forced charge discharge power
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_number.set_sg_battery_forced_charge_discharge_power
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 13051
+                  value: >-
+                    {{ states('input_number.set_sg_battery_forced_charge_discharge_power') |
+                    int}}
+          - conditions: []
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.set_sg_battery_forced_charge_discharge_power
+                data:
+                  value: "{{ states('sensor.battery_forced_charge_discharge_power') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update battery forced charge discharge power input slider update
+    description: Updates battery forced charge discharge power input slider
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.battery_forced_charge_discharge_power
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ not is_state('sensor.battery_forced_charge_discharge_power',
+          'unavailable') }}
+    actions:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.set_sg_battery_forced_charge_discharge_power
+        data:
+          value: "{{ states('sensor.battery_forced_charge_discharge_power') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update battery max charge power
+    description: Sets battery max charge power
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_number.set_sg_battery_max_charge_power
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 33046
+                  value: >-
+                    {{ states('input_number.set_sg_battery_max_charge_power') |float
+                    /10 |int}}
+          - conditions: []
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.set_sg_battery_max_charge_power
+                data:
+                  value: "{{ states('sensor.battery_max_charge_power') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update battery max charge power input slider update
+    description: Updates battery max charge power input slider
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.battery_max_charge_power
+    conditions:
+      - condition: template
+        value_template: "{{ not is_state('sensor.battery_max_charge_power', 'unavailable') }}"
+    actions:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.set_sg_battery_max_charge_power
+        data:
+          value: "{{ states('sensor.battery_max_charge_power') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update battery max discharge power
+    description: Sets battery max discharge power
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_number.set_sg_battery_max_discharge_power
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 33047
+                  value: >-
+                    {{ states('input_number.set_sg_battery_max_discharge_power')
+                    |float /10 |int}}
+          - conditions: []
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.set_sg_battery_max_discharge_power
+                data:
+                  value: "{{ states('sensor.battery_max_discharge_power') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update battery max discharge power input slider update
+    description: Updates battery max discharge power input slider
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.battery_max_discharge_power
+    conditions:
+      - condition: template
+        value_template: "{{ not is_state('sensor.battery_max_discharge_power', 'unavailable') }}"
+    actions:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.set_sg_battery_max_discharge_power
+        data:
+          value: "{{ states('sensor.battery_max_discharge_power') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update battery charging start power
+    description: Sets battery charging start power
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_number.set_sg_battery_charging_start_power
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 33148
+                  value: >-
+                    {{ states('input_number.set_sg_battery_charging_start_power')
+                    |float /10 |int}}
+          - conditions: []
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.set_sg_battery_charging_start_power
+                data:
+                  value: "{{ states('sensor.battery_charging_start_power') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update battery charging start power input slider update
+    description: Updates battery charging start power input slider
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.battery_charging_start_power
+    conditions:
+      - condition: template
+        value_template: "{{ not is_state('sensor.battery_charging_start_power', 'unavailable') }}"
+    actions:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.set_sg_battery_charging_start_power
+        data:
+          value: "{{ states('sensor.battery_charging_start_power') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update battery discharging start power
+    description: Sets battery discharging start power
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_number.set_sg_battery_discharging_start_power
+    conditions: []
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.sg_update_pv_settings
+                state: "on"
+            sequence:
+              - action: modbus.write_register
+                data_template:
+                  hub: SungrowSHx
+                  slave: 1
+                  address: 33149
+                  value: >-
+                    {{ states('input_number.set_sg_battery_discharging_start_power')
+                    |float /10 | int}}
+          - conditions: []
+            sequence:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.set_sg_battery_discharging_start_power
+                data:
+                  value: "{{ states('sensor.battery_discharging_start_power') }}"
+    mode: single
+
+
+  - alias: sungrow inverter update battery discharging start power input slider update
+    description: Updates battery discharging start power input slider
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.battery_discharging_start_power
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ not is_state('sensor.battery_discharging_start_power', 'unavailable')
+          }}
+    actions:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.set_sg_battery_discharging_start_power
+        data:
+          value: "{{ states('sensor.battery_discharging_start_power') }}"
+    mode: single
+
+  - alias: sungrow inverter global mpp scan manual
+    description: Set global mpp scan manual
+    triggers:
+      - trigger: state
+        entity_id:
+          - input_select.set_sg_global_mpp_scan_manual
+        to: Enabled
+    conditions: []
+    actions:
+      - action: modbus.write_register
+        data_template:
+          hub: SungrowSHx
+          slave: 1
+          address: 30229
+          value: "{{export_limit_enable}}"
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.set_sg_global_mpp_scan_manual
+        data:
+          option: >
+            {% if ((states('sensor.global_mpp_scan_manual_raw') | int(default=0)) ==
+            0x00AA) %}
+              Enabled
+            {% elif ((states('sensor.global_mpp_scan_manual_raw') | int(default=0))
+            == 0x0055) %}
+              Disabled
+            {% endif %}
+    mode: single
+    variables:
+      export_limit_enable: 170
+      export_limit_disable: 85
+
+
+  - alias: sungrow inverter global mpp scan manual input select update
+    description: Updates Enable/Disable for global mpp scan manual
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.global_mpp_scan_manual_raw
+    conditions:
+      - condition: template
+        value_template: "{{ not is_state('sensor.global_mpp_scan_manual_raw', 'unavailable') }}"
+    actions:
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.set_sg_global_mpp_scan_manual
+        data:
+          option: >
+            {% if ((states('sensor.global_mpp_scan_manual_raw') | int(default=0)) ==
+            0x00AA) %}
+              Enabled
+            {% elif ((states('sensor.global_mpp_scan_manual_raw') | int(default=0))
+            == 0x0055) %}
+              Disabled
+            {% endif %}
+    mode: single
+
+# Usage: Use these scripts to simplify automations
+# Example (Adjust to your needs with appropriate trigger):
+# automation:
+#  - alias: Forced Battery Charging Management
+#    description: "Manages forced battery charging during cheapest hours."
+#   triggers:
+#      - trigger: state
+#        entity_id:
+#          - binary_sensor.cheapest_hours_for_charging_timer
+#    actions:
+#      - choose:
+#          - conditions:
+#              - condition: state
+#                entity_id: binary_sensor.cheapest_hours_for_charging_timer
+#                state: 'on'
+#            sequence:
+#              - action: script.sg_forced_charge_battery_mode
+#          - conditions:
+#              - condition: state
+#                entity_id: binary_sensor.cheapest_hours_for_charging_timer
+#                state: 'off'
+#            sequence:
+#              - action: script.sg_self_consumption_mode
+
+script:
+  - alias: sg set forced discharge battery mode
+    description: Set PV to forced discharge mode
+    sequence:
+      - action: input_select.select_option
+        data:
+          entity_id: input_select.set_sg_ems_mode
+          option: Forced mode
+      - action: input_select.select_option
+        data:
+          entity_id: input_select.set_sg_battery_forced_charge_discharge_cmd
+          option: "Forced discharge"
+    # Uncomment notify action lines below for push notifications to mobile devices
+    # - action: notify.notify
+    #   data:
+    #     title: "Forced Battery Discharge"
+    #     message: "Switched to Forced Battery Discharge mode"
+
+  - alias: sg set forced charge battery mode
+    description: Set PV to forced charge mode to default (stop)
+    sequence:
+      - action: input_select.select_option
+        data:
+          entity_id: input_select.set_sg_ems_mode
+          option: Forced mode
+      - action: input_select.select_option
+        data:
+          entity_id: input_select.set_sg_battery_forced_charge_discharge_cmd
+          option: Forced charge
+
+
+  - alias: sg set battery bypass mode
+    description: Set PV to forced battery charge/discharge mode to default (stop)
+    sequence:
+      - action: input_select.select_option
+        data:
+          entity_id: input_select.set_sg_ems_mode
+          option: Forced mode
+      - action: input_select.select_option
+        data:
+          entity_id: input_select.set_sg_battery_forced_charge_discharge_cmd
+          option: Stop (default)
+
+  # Self-consumption mode with battery discharging disabled. Will still charge from solar. Intended for preserving battery capacity for high-price periods.
+  - alias: sg set self consumption limited discharge
+    description: Set PV self consumption limited discharge
+    sequence:
+    - action: input_select.select_option
+      data:
+        entity_id: input_select.set_sg_ems_mode
+        option: Self-consumption mode (default)
+    - action: input_select.select_option
+      data:
+        entity_id: input_select.set_sg_battery_forced_charge_discharge_cmd
+        option: Stop (default)
+    - action: input_number.set_value
+      data:
+        entity_id: input_number.set_sg_battery_max_discharge_power
+        value: 10
+
+
+  - alias: sg set self consumption mode
+    description: Set PV self consumption mode
+    sequence:
+      - action: input_select.select_option
+        data:
+          entity_id: input_select.set_sg_ems_mode
+          option: Self-consumption mode (default)
+      - action: input_select.select_option
+        data:
+          entity_id: input_select.set_sg_battery_forced_charge_discharge_cmd
+          option: Stop (default)
+

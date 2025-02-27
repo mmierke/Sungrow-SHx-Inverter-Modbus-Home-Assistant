@@ -1,0 +1,293 @@
+# Home Assistant Sungrow inverter integration Helpers
+# https://github.com/mkaiser/Sungrow-SHx-Inverter-Modbus-Home-Assistant
+# by Martin Mierke
+#
+# last update: 2025-02-25
+#
+# Note: This YAML file will only work with Home Assistant >= 2024.10
+
+# Toggle to prefent unwanted updates to the PV settings
+input_boolean:
+  sg_update_pv_settings:
+    name: Update PV Settings
+    icon: mdi:solar-power-variant-outline
+    initial: false
+
+# getting input for Min and Max SoC
+input_number:
+  set_sg_min_soc:
+    name: Min SoC (%)
+    min: 0
+    max: 50
+    step: 1
+
+  sg_min_soc_pref:
+    name: Min SoC prefered(%)
+    min: 0
+    max: 50
+    step: 1
+    initial: 5
+
+  set_sg_max_soc:
+    name: Max SoC (%)
+    min: 50
+    max: 100
+    step: 1
+
+  sg_max_soc_pref:
+    name: Max SoC prefered(%)
+    min: 50
+    max: 100
+    step: 1
+    initial: 100
+
+  set_sg_reserved_soc_for_backup:
+    name: Reserved SoC for backup (%)
+    min: 0
+    max: 100
+    step: 1
+
+  sg_reserved_soc_for_backup_pref:
+    name: Reserved SoC for backup prefered(%)
+    min: 0
+    max: 100
+    step: 1
+    initial: 0
+
+  set_sg_battery_forced_charge_discharge_power:
+    name: Forced charge discharge power (W)
+    min: 0
+    max: 5000 # change this value according to the capability of your battery
+    step: 100
+
+  sg_battery_forced_charge_discharge_power_pref:
+    name: Forced charge discharge power prefered(W)
+    min: 0
+    max: 5000 # change this value according to the capability of your battery
+    step: 100
+    initial: 5000
+
+  set_sg_battery_max_charge_power:
+    name: Max battery charge power (W)
+    min: 100
+    max: 5000 # change this value according to the capability of your battery
+    step: 100
+
+  sg_battery_max_charge_power_pref:
+    name: Max battery charge power prefered(W)
+    min: 100
+    max: 5000 # change this value according to the capability of your battery
+    step: 100
+    initial: 5000
+
+  set_sg_battery_max_discharge_power:
+    name: Max battery discharge power (W)
+    min: 100
+    max: 5000 # change this value according to the capability of your battery
+    step: 100
+
+  sg_battery_max_discharge_power_pref:
+    name: Max battery discharge power prefered(W)
+    min: 100
+    max: 5000 # change this value according to the capability of your battery
+    step: 100
+    initial: 5000
+
+  # This threshold is compared against the currently achievable charging power, not just against the currently available surplus.
+  # If this is set higher than the maximum charging power of the battery, charging will not start.
+  # If currently achievable charging power drops below this threshold, charging will stop. Actual charging power (limited by register 33047) is ignored.
+  # Charging might stop before reaching 100% if set too close to the maximum charging power of the battery, due to achievable charging power naturally dropping at high state of charge.
+  set_sg_battery_charging_start_power:
+    name: Battery charging start power (W)
+    min: 0
+    max: 1000
+    step: 10
+
+  sg_battery_charging_start_power_pref:
+    name: Battery charging start power prefered(W)
+    min: 0
+    max: 1000
+    step: 10
+    initial: 50
+
+  set_sg_battery_discharging_start_power:
+    name: Battery discharging start power (W)
+    min: 0
+    max: 1000
+    step: 10
+
+  sg_battery_discharging_start_power_pref:
+    name: Battery discharging start power prefered(W)
+    min: 0
+    max: 1000
+    step: 10
+    initial: 50
+
+  set_sg_export_power_limit:
+    name: Export power limit (W)
+    min: 0
+    max: 10500 # TODO Note: max for SH10.RT. It would be nice to have this as a global variable /secret
+    step: 100
+
+  sg_export_power_limit_pref:
+    name: Export power limit prefered(W)
+    min: 0
+    max: 10500 # TODO Note: max for SH10.RT. It would be nice to have this as a global variable /secret
+    step: 100
+    initial: 10500
+
+input_select:
+  set_sg_inverter_run_mode:
+    name: Inverter mode
+    options:
+      - "Enabled"
+      - "Shutdown"
+
+  sg_inverter_run_mode_pref:
+    name: Inverter mode prefered
+    options:
+      - "Enabled"
+      - "Shutdown"
+    initial: "Enabled"
+
+  # get input for battery mode (forced charge/discharge, stop (default) )
+  set_sg_ems_mode:
+    name: EMS mode
+    options:
+      - "Self-consumption mode (default)"
+      - "Forced mode"
+      - "External EMS"
+    # required for multiple inverters main /follower?
+    # these are commented, because they are rarely used
+    #      - "VPP"
+    #      - "MicroGrid"
+    icon: mdi:battery-unknown
+
+  sg_ems_mode_pref:
+    name: EMS mode prefered
+    options:
+      - "Self-consumption mode (default)"
+      - "Forced mode"
+      - "External EMS"
+    # required for multiple inverters main /follower?
+    # these are commented, because they are rarely used
+    #      - "VPP"
+    #      - "MicroGrid"
+    icon: mdi:battery-unknown
+    initial: "Self-consumption mode (default)"
+
+  set_sg_battery_forced_charge_discharge_cmd:
+    name: Battery forced charge discharge cmd
+    options:
+      - "Stop (default)"
+      - "Forced charge"
+      - "Forced discharge"
+    icon: mdi:battery-unknown
+
+  sg_battery_forced_charge_discharge_cmd_pref:
+    name: Battery forced charge discharge cmd prefered
+    options:
+      - "Stop (default)"
+      - "Forced charge"
+      - "Forced discharge"
+    icon: mdi:battery-unknown
+    initial: "Stop (default)"
+
+  set_sg_backup_mode:
+    name: Backup mode
+    options:
+      - "Enabled"
+      - "Disabled"
+    icon: mdi:export
+
+  sg_backup_mode_pref:
+    name: Backup mode prefered
+    options:
+      - "Enabled"
+      - "Disabled"
+    icon: mdi:export
+    initial: "Enabled"
+
+  set_sg_export_power_limit_mode:
+    name: Export power limit mode
+    options:
+      - "Enabled"
+      - "Disabled"
+    icon: mdi:export
+
+  sg_export_power_limit_mode_pref:
+    name: Export power limit mode prefered
+    options:
+      - "Enabled"
+      - "Disabled"
+    icon: mdi:export
+    initial: "Disabled"
+
+
+  # No need for a prefered value helper to hold the default value
+  set_sg_global_mpp_scan_manual:
+    name: Global mpp scan manual
+    options:
+      - "Enabled"
+      - "Disabled"
+    icon: mdi:export
+
+# Binary sensors to flag if sg paramters meet there prefered state (device class problem is ok when the template returns false)
+binary_sensor:
+  - platform: template
+    sensors:
+      sg_export_power_limit_mode_chk:
+        device_class: problem
+        value_template: >-
+          {{states('sensor.export_power_limit_mode')!=states('input_select.sg_export_power_limit_mode_pref')}}
+     
+      sg_update_pv_settings_chk:
+        device_class: problem
+        value_template: >-
+          {{is_state('input_boolean.sg_update_pv_settings', "on")}}
+      
+      sg_min_soc_chk:
+        device_class: problem
+        value_template: >-
+          {{states('sensor.min_soc')|int != states('input_number.sg_min_soc_pref')|int}}
+          
+      sg_max_soc_chk:
+        device_class: problem
+        value_template: >-
+          {{states('sensor.max_soc')|int != states('input_number.sg_max_soc_pref')|int}}
+
+      sg_reserved_soc_for_backup_chk:
+        device_class: problem
+        value_template: >-
+          {{states('sensor.reserved_soc_for_backup')|int != states('input_number.sg_reserved_soc_for_backup_pref')|int}}
+
+      sg_battery_forced_charge_discharge_power_chk:
+        device_class: problem
+        value_template: >-
+          {{states('sensor.battery_forced_charge_discharge_power')|int != states('input_number.sg_battery_forced_charge_discharge_power_pref')|int}}
+
+      sg_battery_max_charge_power_chk:
+        device_class: problem
+        value_template: >-
+          {{states('sensor.battery_max_charge_power')|int != states('input_number.sg_battery_max_charge_power_pref')|int}}
+      
+      sg_battery_max_discharge_power_chk:
+        device_class: problem
+        value_template: >-
+          {{states('sensor.battery_max_discharge_power')|int != states('input_number.sg_battery_max_discharge_power_pref')|int}}
+
+      sg_battery_charging_start_power_chk:
+        device_class: problem
+        value_template: >-
+          {{states('sensor.battery_charging_start_power')|int != states('input_number.sg_battery_charging_start_power_pref')|int}}
+
+      sg_battery_discharging_start_power_chk:
+        device_class: problem
+        value_template: >-
+          {{states('sensor.battery_discharging_start_power')|int != states('input_number.sg_battery_discharging_start_power_pref')|int}}
+
+      sg_export_power_limit_chk:
+        device_class: problem
+        value_template: >-
+          {{(states("sensor.export_power_limit_mode") != "Disabled") and (states("sensor.export_power_limit")|int != states("input_number.sg_export_power_limit_pref")|int)}}
+
